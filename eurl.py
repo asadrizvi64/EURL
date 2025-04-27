@@ -226,8 +226,15 @@ class EnhancedEURLTransformer(nn.Module):
             A = attention_weights[layer_idx]  # [batch_size, nhead, seq_len, seq_len]
             
             # Average over attention heads
-            A_avg = A.mean(dim=1)  # [batch_size, seq_len, seq_len]
-            
+            # A_avg = A.mean(dim=1)  # [batch_size, seq_len, seq_len]
+            if A.dim() == 4:
+                # [B, H, T, T] → [B, T, T]
+                A_avg = A.mean(dim=1)
+            elif A.dim() == 3:
+                # [B, T, T]
+                A_avg = A
+            else:
+                raise ValueError(f"Unexpected attention shape {A.shape}")
             # Calculate GraphSim for all token pairs
             graph_sim = torch.zeros_like(target_sim)
             
