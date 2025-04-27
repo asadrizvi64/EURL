@@ -15,3 +15,7 @@ training:
   epochs: 10
   warmup_steps: 4000
   max_seq_length: 512
+
+dataset:
+  name: "wikitext"
+  version: "wikitext-103-raw-v1"
