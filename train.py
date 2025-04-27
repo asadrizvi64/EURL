@@ -7,49 +7,58 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 from eurl import EnhancedEURLTransformer, train_epoch, evaluate
 
+import argparse
+import yaml
+import torch
+import os
+from torch.utils.data import Dataset, DataLoader
+from datasets import load_dataset
+from transformers import AutoTokenizer
+from eurl import EnhancedEURLTransformer, train_epoch, evaluate
+
+# Move TextDataset outside the function
+class TextDataset(Dataset):
+    def __init__(self, dataset, tokenizer, max_length):
+        self.dataset = dataset
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+    
+    def __len__(self):
+        return len(self.dataset)
+    
+    def __getitem__(self, idx):
+        # Get text from dataset
+        text = self.dataset[idx]['text']
+        if not text.strip():  # Skip empty lines
+            text = "empty"
+        
+        # Tokenize text
+        encodings = self.tokenizer(
+            text,
+            max_length=self.max_length,
+            padding='max_length',
+            truncation=True,
+            return_tensors='pt'
+        )
+        
+        # Create input and target (shifted by 1 for language modeling)
+        input_ids = encodings['input_ids'].squeeze()
+        target_ids = input_ids.clone()
+        
+        # Ensure tensors are at least 2 tokens long (for input/target shift)
+        if input_ids.size(0) < 2:
+            # Pad to ensure at least 2 tokens
+            padded = torch.full((2,), self.tokenizer.pad_token_id, dtype=torch.long)
+            padded[:input_ids.size(0)] = input_ids
+            input_ids = padded
+            target_ids = padded.clone()
+        
+        # Return inputs and targets (shifted by 1)
+        return input_ids[:-1], target_ids[1:]
+
 def create_dataloader(dataset_name, dataset_version, split, tokenizer, max_length, batch_size):
     # Load dataset from Hugging Face
     raw_dataset = load_dataset(dataset_name, dataset_version, split=split)
-    
-    # Create a dataset class that tokenizes the text
-    class TextDataset(Dataset):
-        def __init__(self, dataset, tokenizer, max_length):
-            self.dataset = dataset
-            self.tokenizer = tokenizer
-            self.max_length = max_length
-        
-        def __len__(self):
-            return len(self.dataset)
-        
-        def __getitem__(self, idx):
-            # Get text from dataset
-            text = self.dataset[idx]['text']
-            if not text.strip():  # Skip empty lines
-                text = "empty"
-            
-            # Tokenize text
-            encodings = self.tokenizer(
-                text,
-                max_length=self.max_length,
-                padding='max_length',
-                truncation=True,
-                return_tensors='pt'
-            )
-            
-            # Create input and target (shifted by 1 for language modeling)
-            input_ids = encodings['input_ids'].squeeze()
-            target_ids = input_ids.clone()
-            
-            # Ensure tensors are at least 2 tokens long (for input/target shift)
-            if input_ids.size(0) < 2:
-                # Pad to ensure at least 2 tokens
-                padded = torch.full((2,), tokenizer.pad_token_id, dtype=torch.long)
-                padded[:input_ids.size(0)] = input_ids
-                input_ids = padded
-                target_ids = padded.clone()
-            
-            # Return inputs and targets (shifted by 1)
-            return input_ids[:-1], target_ids[1:]
     
     # Create dataset
     dataset = TextDataset(raw_dataset, tokenizer, max_length)
@@ -60,7 +69,7 @@ def create_dataloader(dataset_name, dataset_version, split, tokenizer, max_lengt
         batch_size=batch_size,
         shuffle=(split == 'train'),
         collate_fn=collate_batch,  # Custom collate function to handle variable lengths
-        num_workers=2
+        num_workers=0  # Set to 0 to avoid multiprocessing issues
     )
     
     return dataloader
