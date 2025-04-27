@@ -202,7 +202,7 @@ class EnhancedEURLTransformer(nn.Module):
     ) -> torch.Tensor:
         """
         Compute Relational Latent Divergence (RLD) loss.
-        
+        yeah
         RLD = (1/N) ∑_{i,j} [GraphSim(z_i, A_ij) - TargetSim(y_i, ŷ_i)]
         """
         batch_size, seq_len = logits.shape[:2]
