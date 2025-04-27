@@ -3,7 +3,7 @@ import yaml
 import torch
 import os
 from torch.utils.data import Dataset, DataLoader
-from huggingface_datasets import load_dataset
+from datasets import load_dataset
 from transformers import AutoTokenizer
 from eurl import EnhancedEURLTransformer, train_epoch, evaluate
 
